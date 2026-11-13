@@ -18,15 +18,18 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: 3. Instalar Flutter SDK Estavel
+      - name: 3. Configurar Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: 4. Instalar Flutter SDK Estavel
         uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
 
-      - name: 4. Instalar Android SDK 35/36 e Desbloquear AAR Metadata do file_picker
+      - name: 5. Instalar Android SDK 35/36 e Desbloquear AAR Metadata do file_picker
         run: |
-          yes | sdkmanager --licenses || true
-          sdkmanager "platforms;android-35" "platforms;android-36" "build-tools;35.0.0"
+          sdkmanager --licenses
+          sdkmanager "platform-tools" "platforms;android-35" "platforms;android-36" "build-tools;35.0.0"
           mkdir -p ~/.gradle/init.d
           cat << 'EOF' > ~/.gradle/init.d/fix_aar_metadata.gradle
           allprojects {
@@ -54,7 +57,7 @@ jobs:
           }
           EOF
 
-      - name: 5. Gerar Estrutura Android e Compilar APK + AAB (Sem Erro de file_picker)
+      - name: 6. Gerar Estrutura Android e Compilar APK + AAB (Sem Erro de file_picker)
         run: |
           flutter create --platforms=android --org br.ufpe.redehpb --project-name rede_hpb_lims .
           sed -i 's/<application/<uses-permission android:name="android.permission.INTERNET"\/><application android:usesCleartextTraffic="true"/g' android/app/src/main/AndroidManifest.xml
@@ -63,7 +66,7 @@ jobs:
           flutter build apk --release --no-tree-shake-icons
           flutter build appbundle --release --no-tree-shake-icons
 
-      - name: 6. Disponibilizar APK (Instalador Direto) e AAB (Google Play Store)
+      - name: 7. Disponibilizar APK (Instalador Direto) e AAB (Google Play Store)
         uses: actions/upload-artifact@v4
         with:
           name: Instaladores-Android-RedeHPB
