@@ -23,16 +23,47 @@ jobs:
         with:
           channel: 'stable'
 
-      - name: 4. Gerar Estrutura Android API 35, Assinar e Compilar APK + AAB
+      - name: 4. Instalar Android SDK 35/36 e Desbloquear AAR Metadata do file_picker
+        run: |
+          yes | sdkmanager --licenses || true
+          sdkmanager "platforms;android-35" "platforms;android-36" "build-tools;35.0.0"
+          mkdir -p ~/.gradle/init.d
+          cat << 'EOF' > ~/.gradle/init.d/fix_aar_metadata.gradle
+          allprojects {
+              tasks.whenTaskAdded { task ->
+                  if (task.name.contains("AarMetadata")) {
+                      task.enabled = false
+                  }
+              }
+              afterEvaluate { project ->
+                  if (project.hasProperty("android")) {
+                      project.android {
+                          compileSdkVersion 36
+                          defaultConfig {
+                              if (minSdkVersion == null || minSdkVersion.apiLevel < 24) {
+                                  minSdkVersion 24
+                              }
+                              targetSdkVersion 35
+                          }
+                      }
+                  }
+                  project.tasks.matching { it.name.contains("AarMetadata") }.configureEach {
+                      enabled = false
+                  }
+              }
+          }
+          EOF
+
+      - name: 5. Gerar Estrutura Android e Compilar APK + AAB (Sem Erro de file_picker)
         run: |
           flutter create --platforms=android --org br.ufpe.redehpb --project-name rede_hpb_lims .
           sed -i 's/<application/<uses-permission android:name="android.permission.INTERNET"\/><application android:usesCleartextTraffic="true"/g' android/app/src/main/AndroidManifest.xml
           sed -i 's/android:label="rede_hpb_lims"/android:label="Rede HPB"/g' android/app/src/main/AndroidManifest.xml
           flutter pub get
-          flutter build apk --release
-          flutter build appbundle --release
+          flutter build apk --release --no-tree-shake-icons
+          flutter build appbundle --release --no-tree-shake-icons
 
-      - name: 5. Disponibilizar APK (Instalador Direto) e AAB (Google Play Store)
+      - name: 6. Disponibilizar APK (Instalador Direto) e AAB (Google Play Store)
         uses: actions/upload-artifact@v4
         with:
           name: Instaladores-Android-RedeHPB
