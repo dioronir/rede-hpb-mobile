@@ -78,6 +78,9 @@ jobs:
           EOF
           rm -f android/app/build.gradle.kts
           flutter pub get
+          if [ -f logo_hpb.png ]; then
+            dart run flutter_launcher_icons
+          fi
           flutter build apk --release --no-tree-shake-icons
           flutter build appbundle --release --no-tree-shake-icons
 
