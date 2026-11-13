@@ -18,53 +18,70 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: 3. Instalar Flutter SDK Estavel
+      - name: 3. Instalar Flutter SDK 3.24.5 (Compativel com file_picker e webview_flutter)
         uses: subosito/flutter-action@v2
         with:
+          flutter-version: '3.24.5'
           channel: 'stable'
 
-      - name: 4. Desbloquear AAR Metadata do file_picker no Gradle
+      - name: 4. Gerar Estrutura Android API 35 e Compilar APK + AAB
         run: |
-          mkdir -p ~/.gradle/init.d
-          cat << 'EOF' > ~/.gradle/init.d/fix_aar_metadata.gradle
-          allprojects {
-              tasks.whenTaskAdded { task ->
-                  if (task.name.contains("AarMetadata")) {
-                      task.enabled = false
-                  }
-              }
-              afterEvaluate { project ->
-                  if (project.hasProperty("android")) {
-                      project.android {
-                          compileSdkVersion 36
-                      }
-                  }
-                  project.tasks.matching { it.name.contains("AarMetadata") }.configureEach {
-                      enabled = false
-                  }
-              }
-          }
-          EOF
-
-      - name: 5. Gerar Estrutura Android API 36 e Compilar APK + AAB
-        run: |
+          rm -rf ~/.gradle/init.d/fix_aar_metadata.gradle
           flutter create --platforms=android --org br.ufpe.redehpb --project-name rede_hpb_lims .
           sed -i 's/<application/<uses-permission android:name="android.permission.INTERNET"\/><application android:usesCleartextTraffic="true"/g' android/app/src/main/AndroidManifest.xml
           sed -i 's/android:label="rede_hpb_lims"/android:label="Rede HPB"/g' android/app/src/main/AndroidManifest.xml
-          if [ -f android/app/build.gradle ]; then
-            sed -i 's/compileSdk = flutter.compileSdkVersion/compileSdk = 36/g' android/app/build.gradle
-            sed -i 's/compileSdkVersion flutter.compileSdkVersion/compileSdkVersion 36/g' android/app/build.gradle
-            sed -i 's/targetSdk = flutter.targetSdkVersion/targetSdk = 35/g' android/app/build.gradle
-          fi
-          if [ -f android/app/build.gradle.kts ]; then
-            sed -i 's/compileSdk = flutter.compileSdkVersion/compileSdk = 36/g' android/app/build.gradle.kts
-            sed -i 's/targetSdk = flutter.targetSdkVersion/targetSdk = 35/g' android/app/build.gradle.kts
-          fi
+          cat << 'EOF' > android/app/build.gradle
+          plugins {
+              id "com.android.application"
+              id "kotlin-android"
+              id "dev.flutter.flutter-gradle-plugin"
+          }
+
+          android {
+              namespace = "br.ufpe.redehpb.rede_hpb_lims"
+              compileSdk = 35
+
+              compileOptions {
+                  sourceCompatibility = JavaVersion.VERSION_17
+                  targetCompatibility = JavaVersion.VERSION_17
+              }
+
+              kotlinOptions {
+                  jvmTarget = "17"
+              }
+
+              defaultConfig {
+                  applicationId = "br.ufpe.redehpb.rede_hpb_lims"
+                  minSdk = 24
+                  targetSdk = 35
+                  versionCode = 1
+                  versionName = "1.0.0"
+              }
+
+              lint {
+                  checkReleaseBuilds = false
+                  abortOnError = false
+              }
+
+              buildTypes {
+                  release {
+                      signingConfig = signingConfigs.getByName("debug")
+                      minifyEnabled = false
+                      shrinkResources = false
+                  }
+              }
+          }
+
+          flutter {
+              source = "../.."
+          }
+          EOF
+          rm -f android/app/build.gradle.kts
           flutter pub get
           flutter build apk --release --no-tree-shake-icons
           flutter build appbundle --release --no-tree-shake-icons
 
-      - name: 6. Disponibilizar APK (Instalador Direto) e AAB (Google Play Store)
+      - name: 5. Disponibilizar APK (Instalador Direto) e AAB (Google Play Store)
         uses: actions/upload-artifact@v4
         with:
           name: Instaladores-Android-RedeHPB
